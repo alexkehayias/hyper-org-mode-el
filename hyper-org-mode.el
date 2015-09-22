@@ -7,7 +7,24 @@
 ;; org server
 (defvar hyper-org-url "http://127.0.0.1:1986")
 
-(defun write-to-file ())
+(defun string-to-file (file-name content)
+  "Save the contents to file.
+   Example:
+   (string-to-file \"/path/to/file.org\" \"content here\""
+  (save-excursion
+    (let (buf)
+      (unwind-protect
+          (progn
+            (setq buf (find-file-noselect file-name t))
+            (when buf
+              (set-buffer buf)
+              (toggle-read-only -1)
+              (erase-buffer)
+              (insert content)
+              (save-buffer)))
+        (if buf (kill-buffer buf))))))
+
+;; (string-to-file "/Users/alexkehayias/Desktop/test.txt" "yo")
 
 (defun handle-conflict ())
 
@@ -21,7 +38,7 @@
            ;; TODO on success save to the file
            :success (function*
                      (lambda (&key data &allow-other-keys)
-                       (message "SUCCESS: %S" data &key &allow-other-keys)))
+                       (message "SUCCESS: %S" data)))
            :error (function* (lambda (&key error-thrown &allow-other-keys&rest _)
                                (message "Got error: %S" error-thrown)))))
 
