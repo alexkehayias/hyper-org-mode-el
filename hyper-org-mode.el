@@ -92,7 +92,10 @@
                           (message "Finished syncing %S" file-name))))))
 
 (defun hyper-org-push (proposed-file-name proposed-file-path previous-file-name previous-file-path)
-  "Push changes from local file to server.
+  "Push changes from local file to server and deletes the proposed file path.
+   This assumes that proposed file path is a temporary file. This
+   is due to this being asynchronous.
+
    Example:
    (hyper-org-push \"/my/file/path\" \"todo.org\" \"previous-todo.org\")"
   (message "Pushing changes to %S" proposed-file-name)
@@ -109,7 +112,9 @@
                        (lambda (&key data &allow-other-keys)
                          ;; Copy the working copy to previous
                          ;; file as that is now the new checkpoint
-                         (copy-file proposed-file-path previous-file-path)))
+                         (progn
+                           (copy-file proposed-file-path previous-file-path)
+                           (delete-file proposed-file-path))))
              ;; TODO on error open up ediff
              :error (function*
                      (lambda (&key data &allow-other-keys)
@@ -135,10 +140,10 @@
          (tmp-file-path (make-temp-file (concat hyper-org-dir "/") nil ".tmp")))
     (when (and (member file-name hyper-org-files)
                (equal file-path (concat hyper-org-dir "/" file-name)))
-      (message "TMP PATH %S" tmp-file-path)
       (overwrite-file tmp-file-path (buffer-substring-no-properties (point-min)
                                                                     (point-max)))
       (hyper-org-push file-name tmp-file-path prev-file-name prev-file-path))
+    ;; Need nil here or it aborts the save
     nil))
 
 ;; Run the synchronization with the server in the background
