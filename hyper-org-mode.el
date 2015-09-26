@@ -91,34 +91,32 @@
                         (lambda (&key data &allow-other-keys)
                           (message "Finished syncing %S" file-name))))))
 
-(defun hyper-org-push (file-path proposed-file-name previous-file-name)
+(defun hyper-org-push (proposed-file-name proposed-file-path previous-file-name previous-file-path)
   "Push changes from local file to server.
    Example:
    (hyper-org-push \"/my/file/path\" \"todo.org\" \"previous-todo.org\")"
   (message "Pushing changes to %S" proposed-file-name)
-  (let ((proposed-path (format "%s/%s" file-path proposed-file-name))
-        (previous-path (format "%s/%s" file-path previous-file-name)))
-    (lexical-let ((proposed-file-name proposed-file-name)
-                  (proposed-path proposed-path)
-                  (previous-path previous-path))
-      (request (concat hyper-org-url "/api/v1/push/" proposed-file-name)
-               :type "POST"
-               :files `(("proposed" . ,proposed-path)
-                        ("previous" . ,previous-path))
-               :parser 'json-read
-               ;; If the push is successful, synchronize with the server
-               :success (function*
-                         (lambda (&key data &allow-other-keys)
-                           ;; Copy the working copy to previous
-                           ;; file as that is now the new checkpoint
-                           (copy-file proposed-path previous-path)))
-               ;; TODO on error open up ediff
-               :error (function*
+  (lexical-let ((proposed-file-name proposed-file-name)
+                (proposed-file-path proposed-file-path)
+                (previous-file-path previous-file-path))
+    (request (concat hyper-org-url "/api/v1/push/" proposed-file-name)
+             :type "POST"
+             :files `(("proposed" . ,proposed-file-path)
+                      ("previous" . ,previous-file-path))
+             :parser 'json-read
+             ;; If the push is successful, synchronize with the server
+             :success (function*
                        (lambda (&key data &allow-other-keys)
-                         (message "ERROR: %S" (assoc-default 'files data))))
-               :complete (function*
+                         ;; Copy the working copy to previous
+                         ;; file as that is now the new checkpoint
+                         (copy-file proposed-file-path previous-file-path)))
+             ;; TODO on error open up ediff
+             :error (function*
+                     (lambda (&key data &allow-other-keys)
+                       (message "ERROR: %S" (assoc-default 'files data))))
+             :complete (function*
                         (lambda (&key data &allow-other-keys)
-                          (message "Finished pushing %S" proposed-file-name)))))))
+                          (message "Finished pushing %S" proposed-file-name))))))
 
 ;; Macro for running a function repeatedly in the back ground
 ;; https://github.com/punchagan/dot-emacs/blob/master/punchagan.org
@@ -129,16 +127,19 @@
     ,repeat-time
     (lambda () (run-with-idle-timer ,idle-time nil ,function ,@args))))
 
-(defun hyper-org-post-save ()
-  ;; On post save, check if the saved file is in the list of files
-  ;; that we want to sync. If it is push it to the server.
-  ;; TODO prevent pushing right after syncing somehow
+(defun hyper-org-pre-save ()
   (let* ((file-path (buffer-file-name (current-buffer)))
          (file-name (file-name-nondirectory file-path))
-         (file-name-prev (concat file-name ".prev")))
+         (prev-file-name (concat file-name ".prev"))
+         (prev-file-path (concat hyper-org-dir "/" prev-file-name))
+         (tmp-file-path (make-temp-file (concat hyper-org-dir "/") nil ".tmp")))
     (when (and (member file-name hyper-org-files)
                (equal file-path (concat hyper-org-dir "/" file-name)))
-      (hyper-org-push hyper-org-dir file-name file-name-prev))))
+      (message "TMP PATH %S" tmp-file-path)
+      (overwrite-file tmp-file-path (buffer-substring-no-properties (point-min)
+                                                                    (point-max)))
+      (hyper-org-push file-name tmp-file-path prev-file-name prev-file-path))
+    nil))
 
 ;; Run the synchronization with the server in the background
 (defun hyper-org-set-timers ()
@@ -154,6 +155,8 @@
 ;; the var "synced-files" then push the file to the server
 (add-hook 'org-mode-hook
           (lambda ()
-            (add-hook 'after-save-hook 'hyper-org-post-save)))
+            (add-hook 'write-contents-functions
+                      (lambda () (save-excursion (hyper-org-pre-save)))
+                      nil t)))
 
 (provide 'hyper-org-mode)
