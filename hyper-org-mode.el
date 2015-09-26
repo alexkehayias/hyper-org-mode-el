@@ -11,6 +11,9 @@
 ;; Override this to decide which files to sync
 (defvar hyper-org-files (list "todo.org"))
 
+;; Override this to set how often to sync with server
+(defvar hyper-org-sync-freq-sec 5)
+
 (defun overwrite-file (file-name content)
   (with-current-buffer (find-file-noselect file-name t)
     (message "Overwriting file %S" file-name)
@@ -123,9 +126,14 @@
   (message "POST SAVED"))
 
 ;; Run the synchronization with the server in the background
-;; repeatedly every 5 seconds
-;; TODO extend this to synchronize multiple files
-(run-with-timer-when-idle 5 5 5 'hyper-org-pull "todo.org")
+(defun hyper-org-set-timers ()
+  (dolist (el hyper-org-files)
+    (lexical-let ((f el))
+      (message "Initializing hyper-org sync for file %S" f)
+      (run-with-timer-when-idle 0 hyper-org-sync-freq-sec hyper-org-sync-freq-sec 'hyper-org-pull f))))
+
+(hyper-org-set-timers)
+
 
 ;; TODO post save hook for org mode, if it has a file name that is in
 ;; the var "synced-files" then push the file to the server
