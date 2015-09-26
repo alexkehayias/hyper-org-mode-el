@@ -1,4 +1,5 @@
 (require 'request)
+(require 'url)
 
 ;; Override this in your init.el to set the directory location of
 ;; hyper org files
@@ -17,12 +18,12 @@
           (progn
             (setq buf (find-file-noselect file-name t))
             (when buf
+              (message "Saving %S" file-name)
               (set-buffer buf)
               (toggle-read-only -1)
               (erase-buffer)
               (insert content)
-              (save-buffer)))
-        (if buf (kill-buffer buf))))))
+              (save-buffer)))))))
 
 ;; (string-to-file "/Users/alexkehayias/Desktop/test.txt" "yo")
 
@@ -33,14 +34,23 @@
 
    Example:
    (hyper-org-pull \"todo.org\")"
-  (request (concat hyper-org-url "/api/v1/pull/" file-name)
-           :type "GET"
-           ;; TODO on success save to the file
-           :success (function*
+  (message "Getting %S" (concat hyper-org-url "/api/v1/pull/" file-name))
+  (lexical-let ((file-name file-name))
+    (request (concat hyper-org-url "/api/v1/pull/" file-name)
+             :type "GET"
+             :parser (lambda () (buffer-string))
+             :success (function*
+                       (lambda (&key data &allow-other-keys)
+                         (when data
+                           (string-to-file
+                            (concat hyper-org-dir "/" file-name) data))))
+             ;; TODO on error open up ediff
+             :error (function*
                      (lambda (&key data &allow-other-keys)
-                       (message "SUCCESS: %S" data)))
-           :error (function* (lambda (&key error-thrown &allow-other-keys&rest _)
-                               (message "Got error: %S" error-thrown)))))
+                       (message "ERROR: %S" (assoc-default 'files data))))
+             :complete (function*
+                        (lambda (&key data &allow-other-keys)
+                          (message "Finished syncing"))))))
 
 (defun hyper-org-push (file-path proposed-file-name previous-file-name)
   "Push changes from local file to server.
@@ -49,7 +59,7 @@
   (prin1 (concat file-path "/" proposed-file-name))
   (let ((proposed-path (format "%s/%s" file-path proposed-file-name))
         (previous-path (format "%s/%s" file-path previous-file-name)))
-    (request (concat hyper-org-url "/api/v1/pull/" file-path)
+    (request (concat hyper-org-url "/api/v1/push/" file-path)
              :type "POST"
              :files `(("proposed" . ,proposed-path)
                       ("previous" . ,previous-path))
