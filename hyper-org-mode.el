@@ -95,7 +95,7 @@
   "Push changes from local file to server.
    Example:
    (hyper-org-push \"/my/file/path\" \"todo.org\" \"previous-todo.org\")"
-  (message "Pushing %S" (list file-path proposed-file-name previous-file-name))
+  (message "Pushing changes to %S" proposed-file-name)
   (let ((proposed-path (format "%s/%s" file-path proposed-file-name))
         (previous-path (format "%s/%s" file-path previous-file-name)))
     (lexical-let ((proposed-file-name proposed-file-name)
@@ -133,9 +133,11 @@
   ;; On post save, check if the saved file is in the list of files
   ;; that we want to sync. If it is push it to the server.
   ;; TODO prevent pushing right after syncing somehow
-  (let* ((file-name (file-name-nondirectory (buffer-file-name (current-buffer))))
+  (let* ((file-path (buffer-file-name (current-buffer)))
+         (file-name (file-name-nondirectory file-path))
          (file-name-prev (concat file-name ".prev")))
-    (when (member file-name hyper-org-files)
+    (when (and (member file-name hyper-org-files)
+               (equal file-path (concat hyper-org-dir "/" file-name)))
       (hyper-org-push hyper-org-dir file-name file-name-prev))))
 
 ;; Run the synchronization with the server in the background
@@ -153,3 +155,5 @@
 (add-hook 'org-mode-hook
           (lambda ()
             (add-hook 'after-save-hook 'hyper-org-post-save)))
+
+(provide 'hyper-org-mode)

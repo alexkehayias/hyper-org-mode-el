@@ -1,0 +1,15 @@
+* hyper-org-mode
+** About
+Hyper org-mode provides real-time collaboration of org mode files via a server (see https://github.com/alexkehayias/hyper-org-mode). This package provides automatic local file syncing of org files in the background.
+** Usage
+In your emacs init file, add the following snippets:
+#+BEGIN_SRC elisp
+(require 'hyper-org-mode)
+(setq hyper-org-dir "/.hyper-org")
+(setq hyper-org-url "http://127.0.0.1:1986")
+(setq hyper-org-files (list "todo.org"))
+(setq hyper-org-sync-freq-sec 5)
+#+END_SRC
+This will synchronize files every 5 seconds with the server. Whenever you save a file locally it will push a copy to the server.
+** Conflict Resolution
+Coming soon!
